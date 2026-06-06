@@ -10,6 +10,8 @@ import { useI18n } from '@/i18n'
 import { buildCommitChangelog, type CommitGroup } from '@/lib/commit-changelog'
 import { AlertCircle, Check, CheckCircle2, Copy, Loader2, Sparkles, Terminal } from '@/lib/icons'
 import { cn } from '@/lib/utils'
+import { resolveUpdateCopy, type UpdateTarget } from '@/lib/update-copy'
+import { $connection } from '@/store/session'
 import {
   $updateApply,
   $updateChecking,
@@ -22,6 +24,10 @@ import {
   type UpdateApplyState
 } from '@/store/updates'
 
+/** What the overlay is acting on. In remote thin-client mode the overlay
+ *  targets the connected BACKEND; otherwise the local desktop client.
+ *  (Type re-exported from the copy helper.) */
+
 function totalItems(groups: readonly CommitGroup[]) {
   return groups.reduce((sum, g) => sum + g.items.length, 0)
 }
@@ -31,6 +37,8 @@ export function UpdatesOverlay() {
   const status = useStore($updateStatus)
   const checking = useStore($updateChecking)
   const apply = useStore($updateApply)
+  const connection = useStore($connection)
+  const target: UpdateTarget = connection?.mode === 'remote' ? 'backend' : 'client'
 
   useEffect(() => {
     if (open && !status && !checking) {
@@ -90,6 +98,7 @@ export function UpdatesOverlay() {
             onLater={() => handleClose(false)}
             onRetryCheck={() => void checkUpdates()}
             status={status}
+            target={target}
           />
         )}
       </DialogContent>
@@ -104,7 +113,8 @@ function IdleView({
   onInstall,
   onLater,
   onRetryCheck,
-  status
+  status,
+  target
 }: {
   behind: number
   checking: boolean
@@ -113,6 +123,7 @@ function IdleView({
   onLater: () => void
   onRetryCheck: () => void
   status: DesktopUpdateStatus | null
+  target: UpdateTarget
 }) {
   const { t } = useI18n()
   const u = t.updates
@@ -176,6 +187,12 @@ function IdleView({
   const shownItems = totalItems(groups)
   const remaining = Math.max(0, behind - shownItems)
 
+  // Name what's being updated. In remote mode the overlay acts on the connected
+  // backend, not the local client — say so. When there are no commit rows to
+  // show (e.g. pip/non-git backend), degrade to honest "no release notes" copy
+  // instead of generic filler.
+  const { title, body } = resolveUpdateCopy({ target, shownItems, copy: u })
+
   return (
     <div className="grid gap-5 px-6 pb-6 pt-7 pr-8">
       <div className="flex flex-col items-center gap-3 text-center">
@@ -183,9 +200,9 @@ function IdleView({
           <Sparkles className="size-7" />
         </span>
 
-        <DialogTitle className="text-center text-xl">{u.availableTitle}</DialogTitle>
+        <DialogTitle className="text-center text-xl">{title}</DialogTitle>
         <DialogDescription className="text-center text-sm">
-          {u.availableBody}
+          {body}
         </DialogDescription>
       </div>
 

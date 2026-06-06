@@ -930,6 +930,9 @@ export interface Translations {
     allSetTitle: string
     availableTitle: string
     availableBody: string
+    availableTitleBackend: string
+    availableBodyBackend: string
+    availableBodyNoChangelog: string
     updateNow: string
     maybeLater: string
     moreChanges: (count: number) => string
